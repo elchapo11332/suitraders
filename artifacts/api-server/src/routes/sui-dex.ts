@@ -286,6 +286,66 @@ async function fetchAllPairs(): Promise<Pair[]> {
   return mergedCache;
 }
 
+const searchCache = new Map<string, { pairs: Pair[]; expiry: number }>();
+
+async function searchAllSuiTokens(query: string): Promise<Pair[]> {
+  const key = query.toLowerCase().trim();
+  const cached = searchCache.get(key);
+  if (cached && Date.now() < cached.expiry) return cached.pairs;
+
+  const results: Pair[] = [];
+  const seenAddresses = new Set<string>();
+
+  // Helper to add without duplicates
+  function addPairs(newPairs: Pair[]) {
+    for (const p of newPairs) {
+      const addr = p.pairAddress.toLowerCase();
+      if (!seenAddresses.has(addr)) {
+        seenAddresses.add(addr);
+        results.push(p);
+      }
+    }
+  }
+
+  // 1. GeckoTerminal pool search (covers all SUI pools)
+  try {
+    const data = await geckoFetch(
+      `/search/pools?query=${encodeURIComponent(key)}&network=sui-network&include=base_token,quote_token`
+    ) as { data?: Record<string, unknown>[]; included?: Record<string, unknown>[] };
+    const pools = data.data || [];
+    const included = (data.included || []) as Record<string, unknown>[];
+    addPairs(pools.map((p) => formatGeckoPair(p, included)));
+  } catch { /* ignore */ }
+
+  // 2. RaidenX pair search by token symbol/name
+  try {
+    const data = await raidenFetch(
+      `/pairs?search=${encodeURIComponent(key)}&page=1&limit=50&network=sui`
+    ) as Record<string, unknown>;
+    const arr = (data.docs || data.data || (Array.isArray(data) ? data : [])) as Record<string, unknown>[];
+    addPairs(arr.map(formatRaidenPair));
+  } catch { /* ignore */ }
+
+  // 3. Fallback: filter trending cache for partial matches
+  try {
+    const trending = await fetchAllPairs();
+    const q = key.toLowerCase();
+    const filtered = trending.filter(
+      (p) => (p.baseToken?.symbol || "").toLowerCase().includes(q) ||
+        (p.baseToken?.name || "").toLowerCase().includes(q) ||
+        (p.pairAddress || "").toLowerCase().includes(q) ||
+        (p.baseToken?.address || "").toLowerCase().includes(q)
+    );
+    addPairs(filtered);
+  } catch { /* ignore */ }
+
+  // Sort by volume descending
+  results.sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
+
+  searchCache.set(key, { pairs: results, expiry: Date.now() + 20_000 });
+  return results;
+}
+
 async function fetchRecentCetusEvents(): Promise<unknown[]> {
   if (cetusEventCache && Date.now() < cetusEventExpiry) return cetusEventCache;
   try {
@@ -463,15 +523,12 @@ router.get("/tokens", async (req, res) => {
     const search = req.query.search as string | undefined;
     const sortBy = (req.query.sortBy as string) || "volume";
     const limit = Math.min(parseInt((req.query.limit as string) || "50"), 200);
-    let pairs = await fetchAllPairs();
+    let pairs: Pair[];
     if (search?.trim()) {
-      const q = search.toLowerCase();
-      pairs = pairs.filter(
-        (p) => (p.baseToken?.symbol || "").toLowerCase().includes(q) ||
-          (p.baseToken?.name || "").toLowerCase().includes(q) ||
-          (p.pairAddress || "").toLowerCase().includes(q) ||
-          (p.baseToken?.address || "").toLowerCase().includes(q)
-      );
+      // Use broad search across all SUI tokens when a query is present
+      pairs = await searchAllSuiTokens(search.trim());
+    } else {
+      pairs = await fetchAllPairs();
     }
     pairs.sort((a, b) => {
       const vol = (x: Pair) => x.volume?.h24 ?? 0;

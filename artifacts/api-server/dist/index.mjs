@@ -32644,6 +32644,52 @@ async function fetchAllPairs() {
   mergedExpiry = Date.now() + 3e4;
   return mergedCache;
 }
+var searchCache = /* @__PURE__ */ new Map();
+async function searchAllSuiTokens(query) {
+  const key2 = query.toLowerCase().trim();
+  const cached = searchCache.get(key2);
+  if (cached && Date.now() < cached.expiry) return cached.pairs;
+  const results = [];
+  const seenAddresses = /* @__PURE__ */ new Set();
+  function addPairs(newPairs) {
+    for (const p of newPairs) {
+      const addr = p.pairAddress.toLowerCase();
+      if (!seenAddresses.has(addr)) {
+        seenAddresses.add(addr);
+        results.push(p);
+      }
+    }
+  }
+  try {
+    const data = await geckoFetch(
+      `/search/pools?query=${encodeURIComponent(key2)}&network=sui-network&include=base_token,quote_token`
+    );
+    const pools = data.data || [];
+    const included = data.included || [];
+    addPairs(pools.map((p) => formatGeckoPair(p, included)));
+  } catch {
+  }
+  try {
+    const data = await raidenFetch(
+      `/pairs?search=${encodeURIComponent(key2)}&page=1&limit=50&network=sui`
+    );
+    const arr = data.docs || data.data || (Array.isArray(data) ? data : []);
+    addPairs(arr.map(formatRaidenPair));
+  } catch {
+  }
+  try {
+    const trending = await fetchAllPairs();
+    const q = key2.toLowerCase();
+    const filtered = trending.filter(
+      (p) => (p.baseToken?.symbol || "").toLowerCase().includes(q) || (p.baseToken?.name || "").toLowerCase().includes(q) || (p.pairAddress || "").toLowerCase().includes(q) || (p.baseToken?.address || "").toLowerCase().includes(q)
+    );
+    addPairs(filtered);
+  } catch {
+  }
+  results.sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
+  searchCache.set(key2, { pairs: results, expiry: Date.now() + 2e4 });
+  return results;
+}
 async function fetchRecentCetusEvents() {
   if (cetusEventCache && Date.now() < cetusEventExpiry) return cetusEventCache;
   try {
@@ -32832,12 +32878,11 @@ router2.get("/tokens", async (req, res) => {
     const search = req.query.search;
     const sortBy = req.query.sortBy || "volume";
     const limit = Math.min(parseInt(req.query.limit || "50"), 200);
-    let pairs = await fetchAllPairs();
+    let pairs;
     if (search?.trim()) {
-      const q = search.toLowerCase();
-      pairs = pairs.filter(
-        (p) => (p.baseToken?.symbol || "").toLowerCase().includes(q) || (p.baseToken?.name || "").toLowerCase().includes(q) || (p.pairAddress || "").toLowerCase().includes(q) || (p.baseToken?.address || "").toLowerCase().includes(q)
-      );
+      pairs = await searchAllSuiTokens(search.trim());
+    } else {
+      pairs = await fetchAllPairs();
     }
     pairs.sort((a, b) => {
       const vol = (x) => x.volume?.h24 ?? 0;
