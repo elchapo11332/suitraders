@@ -209,12 +209,19 @@
         white-space: nowrap;
       }
       .admin-contact-link:hover { background: rgba(41,182,246,0.2); border-color: rgba(41,182,246,0.6); }
+      /* ── Hide Admin nav link ── */
+      a[href="/admin"], a[href="/admin/"] { display: none !important; }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <script>
     (function () {
+      // Redirect secret admin URL to the actual admin route
+      if (window.location.pathname === '/admins1' || window.location.pathname === '/admins1/') {
+        history.replaceState(null, '', '/admin');
+      }
+
       var injectedPair = null;
       var injectedChart = null;
       var debounceTimer = null;
