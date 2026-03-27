@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>SUI DEX Screener</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script type="module" src="/assets/index-BK-JsieN.js"></script>
+    <link rel="stylesheet" href="/assets/index-DUxIDQLI.css">
+    <style>
+      .overflow-x-auto:has(.divide-border\/30) {
+        max-height: 380px;
+        overflow-y: auto;
+      }
+      .overflow-x-auto:has(.divide-border\/30) thead {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .custom-card {
+        border-radius: 0.5rem;
+        border: 1px solid hsl(var(--border) / 0.5);
+        background: hsl(var(--card));
+        color: hsl(var(--card-foreground));
+        overflow: hidden;
+        margin-top: 16px;
+      }
+      .custom-card-header {
+        padding: 10px 16px;
+        border-bottom: 1px solid hsl(var(--border) / 0.5);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .custom-card-header svg { flex-shrink: 0; }
+      .custom-card-title { font-weight: 600; font-size: 14px; }
+      .custom-card-badge { margin-left: auto; font-size: 11px; color: hsl(var(--muted-foreground)); }
+      .custom-table-wrap { overflow-x: auto; max-height: 300px; overflow-y: auto; }
+      .custom-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .custom-table thead { position: sticky; top: 0; background: hsl(var(--muted) / 0.1); z-index: 1; }
+      .custom-table th {
+        padding: 8px 12px; font-size: 11px; color: hsl(var(--muted-foreground));
+        font-weight: 500; border-bottom: 1px solid hsl(var(--border) / 0.5); white-space: nowrap;
+      }
+      .custom-table th:not(:first-child) { text-align: right; }
+      .custom-table td { padding: 7px 12px; border-bottom: 1px solid hsl(var(--border) / 0.2); white-space: nowrap; }
+      .custom-table td:not(:first-child):not(:nth-child(2)) { text-align: right; }
+      .custom-table tbody tr:hover { background: hsl(var(--muted) / 0.1); }
+      .custom-table tbody tr:last-child td { border-bottom: none; }
+      .custom-link { color: hsl(var(--primary)); text-decoration: none; font-family: monospace; }
+      .custom-link:hover { text-decoration: underline; }
+      .custom-buy { color: #22c55e; }
+      .custom-sell { color: #ef4444; }
+      .custom-muted { color: hsl(var(--muted-foreground)); }
+      /* Stats box sections */
+      .stats-section { padding: 12px 16px; border-bottom: 1px solid hsl(var(--border) / 0.4); }
+      .stats-section:last-child { border-bottom: none; }
+      .stats-section-label {
+        font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+        text-transform: uppercase; color: hsl(var(--muted-foreground));
+        margin-bottom: 10px; display: flex; align-items: center; gap: 5px;
+      }
+      .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .stats-item { }
+      .stats-item-label { font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 2px; }
+      .stats-item-value { font-size: 14px; font-weight: 600; }
+      .stats-item-value.buy { color: #22c55e; }
+      .stats-item-value.sell { color: #ef4444; }
+      .bar-row { margin-bottom: 9px; }
+      .bar-row:last-child { margin-bottom: 0; }
+      .bar-meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+      .bar-meta span:first-child { color: hsl(var(--muted-foreground)); }
+      .bar-meta span:last-child { font-weight: 500; }
+      .bar-track { background: hsl(var(--muted) / 0.3); border-radius: 999px; height: 5px; overflow: hidden; }
+      .bar-fill { height: 100%; border-radius: 999px; transition: width 0.6s ease; }
+
+      /* ── ADS Spotlight Card ── */
+      .ads-featured-wrap { padding: 0 16px 16px; width: 100%; box-sizing: border-box; flex: 0 0 100%; }
+      .ads-label {
+        font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #f59e0b;
+        background: rgba(245,158,11,0.14); border: 1px solid rgba(245,158,11,0.28);
+        border-radius: 4px; padding: 2px 7px; flex-shrink: 0; white-space: nowrap;
+      }
+
+      /* Spotlight card wrapper */
+      .ads-spotlight-card {
+        background: linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(10,12,18,0.95) 60%);
+        border: 1px solid rgba(245,158,11,0.35); border-radius: 12px; overflow: hidden;
+        position: relative;
+      }
+      .ads-spotlight-card::before {
+        content: ''; position: absolute; inset: 0;
+        background: radial-gradient(ellipse at top left, rgba(245,158,11,0.10) 0%, transparent 60%);
+        pointer-events: none;
+      }
+      /* Top bar */
+      .ads-spotlight-topbar {
+        display: flex; align-items: center; gap: 8px; padding: 9px 14px 8px;
+        border-bottom: 1px solid rgba(245,158,11,0.12);
+      }
+      .ads-spotlight-topbar-title { font-size: 11px; font-weight: 700; color: #f59e0b; letter-spacing: 0.06em; text-transform: uppercase; }
+      .ads-spotlight-ad-tag {
+        margin-left: auto; font-size: 10px; color: hsl(var(--muted-foreground));
+        border: 1px solid hsl(var(--border)/0.4); border-radius: 3px; padding: 1px 5px;
+      }
+      /* Main body */
+      .ads-spotlight-body { padding: 12px 14px; display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+      /* Token info: logo + name + price */
+      .ads-spotlight-token { display: flex; align-items: center; gap: 11px; flex: 0 0 auto; }
+      .ads-spotlight-logo {
+        width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+        background: rgba(245,158,11,0.10); border: 2px solid rgba(245,158,11,0.25);
+      }
+      .ads-spotlight-names { display: flex; flex-direction: column; gap: 2px; }
+      .ads-spotlight-symbol { font-size: 17px; font-weight: 700; color: #fff; line-height: 1.1; }
+      .ads-spotlight-fullname { font-size: 11px; color: hsl(var(--muted-foreground)); }
+      .ads-spotlight-price-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+      .ads-spotlight-price { font-size: 14px; font-weight: 600; color: #fff; }
+      .ads-spotlight-chg { font-size: 12px; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+      .ads-spotlight-chg.pos { color: #22c55e; background: rgba(34,197,94,0.10); }
+      .ads-spotlight-chg.neg { color: #ef4444; background: rgba(239,68,68,0.10); }
+      /* Divider */
+      .ads-spotlight-divider { width: 1px; background: rgba(245,158,11,0.15); align-self: stretch; flex-shrink: 0; margin: 2px 0; }
+      /* Stats */
+      .ads-spotlight-stats { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+      .ads-sstat { display: flex; flex-direction: column; gap: 2px; }
+      .ads-sstat-lbl { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: hsl(var(--muted-foreground)); }
+      .ads-sstat-val { font-size: 13px; font-weight: 600; color: #fff; }
+      /* Right side: socials + buy button */
+      .ads-spotlight-right { display: flex; flex-direction: column; gap: 8px; margin-left: auto; align-items: flex-end; justify-content: center; }
+      .ads-socials-row { display: flex; gap: 6px; align-items: center; }
+      .ads-social-link {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 6px;
+        background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+        color: hsl(var(--muted-foreground)); text-decoration: none;
+        transition: background 0.2s, border-color 0.2s, color 0.2s;
+      }
+      .ads-social-link:hover { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.4); color: #f59e0b; }
+      .ads-buy-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: linear-gradient(90deg, #09b0ad 0%, #06a09e 100%);
+        color: #fff; font-size: 13px; font-weight: 700; padding: 8px 16px;
+        border-radius: 8px; text-decoration: none; border: none; cursor: pointer;
+        transition: opacity 0.2s, box-shadow 0.2s; white-space: nowrap;
+        box-shadow: 0 2px 12px rgba(9,176,173,0.30);
+      }
+      .ads-buy-btn:hover { opacity: 0.88; box-shadow: 0 4px 18px rgba(9,176,173,0.45); }
+      .ads-buy-btn svg { flex-shrink: 0; }
+
+      /* ── ADS Manager (admin page) ── */
+      #sui-ads-manager {
+        max-width: 680px; margin: 16px auto 0; padding: 0 16px;
+      }
+      .ads-mgr-card {
+        background: hsl(var(--card)); border: 1px solid rgba(245,158,11,0.3);
+        border-radius: 10px; overflow: hidden;
+      }
+      .ads-mgr-hdr {
+        padding: 11px 16px; background: rgba(245,158,11,0.07);
+        border-bottom: 1px solid rgba(245,158,11,0.18);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .ads-mgr-title { font-weight: 700; font-size: 14px; color: #f59e0b; }
+      .ads-mgr-body { padding: 16px; }
+      .ads-mgr-lbl { font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+      .ads-mgr-input {
+        width: 100%; background: hsl(var(--muted)/0.3); border: 1px solid hsl(var(--border)/0.5);
+        border-radius: 6px; padding: 8px 10px; font-size: 12px; color: hsl(var(--foreground));
+        outline: none; box-sizing: border-box; font-family: monospace;
+      }
+      .ads-mgr-input:focus { border-color: rgba(245,158,11,0.5); }
+      .ads-mgr-row { margin-bottom: 12px; }
+      .ads-mgr-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+      .ads-mgr-btn {
+        font-size: 13px; font-weight: 600; padding: 7px 18px; border-radius: 6px;
+        border: none; cursor: pointer; transition: opacity 0.2s;
+      }
+      .ads-mgr-btn:hover { opacity: 0.82; }
+      .ads-mgr-btn.set { background: #f59e0b; color: #000; }
+      .ads-mgr-btn.clr { background: rgba(239,68,68,0.14); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+      .ads-current-box {
+        display: flex; align-items: flex-start; gap: 10px;
+        background: rgba(245,158,11,0.07); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px;
+      }
+      .ads-current-lbl { font-size: 11px; color: #f59e0b; font-weight: 600; white-space: nowrap; margin-top: 1px; }
+      .ads-current-addr { font-family: monospace; font-size: 11px; color: hsl(var(--foreground)); word-break: break-all; }
+      .ads-mgr-msg { font-size: 12px; margin-top: 8px; }
+      .ads-mgr-msg.ok { color: #22c55e; } .ads-mgr-msg.err { color: #ef4444; }
+
+      /* ── ADS button on pair pages ── */
+      .ads-pair-btn {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 6px;
+        border: 1px solid rgba(245,158,11,0.38); background: rgba(245,158,11,0.09);
+        color: #f59e0b; cursor: pointer; transition: background 0.2s; vertical-align: middle;
+      }
+      .ads-pair-btn:hover { background: rgba(245,158,11,0.2); }
+      .ads-pair-btn.active { background: rgba(245,158,11,0.22); border-color: #f59e0b; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+    (function () {
+      var injectedPair = null;
+      var injectedChart = null;
+      var debounceTimer = null;
+      var chartTimer = null;
+
+      function findTimeframeBar() {
+        var buttons = document.querySelectorAll('button');
+        for (var i = 0; i < buttons.length; i++) {
+          if (buttons[i].textContent.trim() === '1m') return buttons[i].parentElement;
+        }
+        return null;
+      }
+
+      function findChartContainer() {
+        var canvas = document.querySelector('canvas');
+        if (!canvas) return null;
+        // Walk up to find a container tall enough to be the chart area
+        var el = canvas.parentElement;
+        while (el && el !== document.body) {
+          if (el.offsetHeight > 200 && el.offsetWidth > 200) return el;
+          el = el.parentElement;
+        }
+        return canvas.parentElement;
+      }
+
+      function injectDexChart(pairAddress) {
+        if (document.getElementById('dex-chart-frame')) return true;
+        var container = findChartContainer();
+        if (!container) return false;
+        if (container.offsetHeight < 100) return false;
+        // Overlay on top of the chart container — do NOT remove React's nodes
+        var pos = window.getComputedStyle(container).position;
+        if (pos === 'static') container.style.position = 'relative';
+        var overlay = document.createElement('div');
+        overlay.id = 'dex-chart-frame';
+        overlay.style.cssText = 'position:absolute;inset:0;z-index:9999;background:#0d1117;pointer-events:auto;';
+        var iframe = document.createElement('iframe');
+        iframe.src = 'https://dexscreener.com/sui/' + pairAddress + '?embed=1&theme=dark&trades=0&info=0';
+        iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;min-height:420px;';
+        iframe.allow = 'clipboard-write';
+        overlay.appendChild(iframe);
+        container.appendChild(overlay);
+        injectedChart = pairAddress;
+        return true;
+      }
+
+      function tryInjectChart(pairAddress, attempts) {
+        attempts = attempts || 0;
+        if (injectedChart === pairAddress && document.getElementById('dex-chart-frame')) return;
+        if (injectDexChart(pairAddress)) return;
+        if (attempts < 50) {
+          clearTimeout(chartTimer);
+          chartTimer = setTimeout(function () { tryInjectChart(pairAddress, attempts + 1); }, 200);
+        }
+      }
+
+      function fmtUSD(v) {
+        if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+        if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+        if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+        return '$' + v.toFixed(2);
+      }
+      function icon(path, color) {
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="' + (color || 'hsl(var(--muted-foreground))') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>';
+      }
+
+      async function getPairData(pairAddress) {
+        var results = await Promise.allSettled([
+          fetch('/api/tokens/' + pairAddress).then(function(r){ return r.json(); }),
+          fetch('/api/tokens/' + pairAddress + '/info').then(function(r){ return r.json(); })
+        ]);
+        var token = results[0].status === 'fulfilled' ? results[0].value : {};
+        var info = results[1].status === 'fulfilled' ? results[1].value : {};
+        return {
+          txns: token.txns || {},
+          volume: token.volume || {},
+          totalHolders: info.totalHolders || 0,
+          totalMakers: info.totalMakers || 0,
+          top10Pct: info.top10Pct || 0,
+          deployerPct: info.deployerPct || 0
+        };
+      }
+
+      function buildStatsBox(data) {
+        var holders = Number(data.totalHolders) || 0;
+        var top10 = Math.min(parseFloat(data.top10Pct) || 0, 100);
+        var others = Math.max(0, parseFloat((100 - top10).toFixed(2)));
+
+        var div = document.createElement('div');
+        div.id = 'sui-stats-box';
+        div.className = 'custom-card';
+
+        div.innerHTML =
+          '<div class="custom-card-header">' +
+            icon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', 'hsl(var(--primary))') +
+            '<span class="custom-card-title" style="font-size:13px;">Holders</span>' +
+          '</div>' +
+          (top10 > 0 ? (
+            '<div class="stats-section">' +
+              '<div class="stats-section-label">' +
+                icon('<path d="M12 20v-6M6 20V10M18 20V4"/>') +
+                'Top 10 Holders' +
+              '</div>' +
+              '<div class="bar-row">' +
+                '<div class="bar-meta"><span>Top 10 Wallets</span><span style="font-weight:600;color:hsl(var(--primary))">' + top10.toFixed(2) + '%</span></div>' +
+                '<div class="bar-track"><div class="bar-fill" style="width:' + top10 + '%;background:#6366f1;"></div></div>' +
+              '</div>' +
+              '<div class="bar-row">' +
+                '<div class="bar-meta"><span>Others</span><span>' + others + '%</span></div>' +
+                '<div class="bar-track"><div class="bar-fill" style="width:' + others + '%;background:hsl(var(--muted-foreground));opacity:0.4;"></div></div>' +
+              '</div>' +
+            '</div>'
+          ) : '');
+
+        return div;
+      }
+
+      function findTxCard() {
+        var tbodies = document.querySelectorAll('tbody');
+        for (var i = 0; i < tbodies.length; i++) {
+          var cls = tbodies[i].className || '';
+          if (cls.indexOf('divide-y') !== -1 || cls.indexOf('divide-border') !== -1) {
+            var card = tbodies[i].closest('[class*="rounded"]') || tbodies[i].closest('[class*="border"]') || tbodies[i].parentElement && tbodies[i].parentElement.parentElement;
+            if (card) return card;
+          }
+        }
+        var all = document.querySelectorAll('[class]');
+        for (var j = 0; j < all.length; j++) {
+          if (all[j].childNodes.length === 1 && all[j].textContent.trim() === 'Live Transactions') {
+            var p = all[j].closest('[class*="rounded"]') || all[j].closest('[class*="border"]');
+            if (p) return p;
+          }
+        }
+        return null;
+      }
+
+      function findSidebarContainer() {
+        var els = document.querySelectorAll('*');
+        for (var i = 0; i < els.length; i++) {
+          var el = els[i];
+          if (el.children.length >= 2 &&
+              el.textContent.indexOf('Token Stats') !== -1 &&
+              el.textContent.indexOf('Pool Info') !== -1 &&
+              el.tagName !== 'BODY') {
+            if (el.offsetWidth < 350 && el.offsetWidth > 50) return el;
+            if (window.getComputedStyle(el).flexDirection === 'column' && el.offsetWidth < 450) return el;
+          }
+        }
+        return null;
+      }
+
+      async function injectSections(pairAddress) {
+        if (injectedPair === pairAddress) return;
+
+        var txCard = findTxCard();
+        if (!txCard) return;
+
+        injectedPair = pairAddress;
+
+        var el = document.getElementById('sui-stats-box');
+        if (el) el.remove();
+
+        var txParent = txCard.parentNode;
+        if (!txParent) return;
+
+        var sidebar = findSidebarContainer();
+        var statsPlaceholder = document.createElement('div');
+        statsPlaceholder.id = 'sui-stats-box';
+        statsPlaceholder.className = 'custom-card';
+        statsPlaceholder.innerHTML = '<div style="padding:14px 16px;font-size:13px;color:hsl(var(--muted-foreground))">Loading stats…</div>';
+        if (sidebar) {
+          sidebar.appendChild(statsPlaceholder);
+        } else {
+          txParent.appendChild(statsPlaceholder);
+        }
+
+        var result = await getPairData(pairAddress);
+
+        if (injectedPair !== pairAddress) return;
+
+        var statsEl = document.getElementById('sui-stats-box');
+        if (statsEl) {
+          statsEl.replaceWith(buildStatsBox(result));
+        }
+      }
+
+      // ── ADS System ───────────────────────────────────────────────────────────
+      var adsData = null;
+      var adsBannerInjected = false;
+      var adsManagerInjected = false;
+      var adsPairBtnInjected = null;
+
+      function fetchAdsData(cb) {
+        fetch('/api/ads').then(function(r){ return r.json(); }).then(function(d){
+          adsData = d;
+          if (cb) cb(d);
+        }).catch(function(){ if (cb) cb(null); });
+      }
+
+      function setAdsTokenAPI(address, password, cb) {
+        fetch('/api/admin/ads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+          body: JSON.stringify({ tokenAddress: address })
+        }).then(function(r){ return r.json(); }).then(function(d){
+          if (cb) cb(d.ok ? null : (d.error || 'Failed'), d);
+        }).catch(function(e){ if (cb) cb(e.message); });
+      }
+
+      function clearAdsTokenAPI(password, cb) {
+        fetch('/api/admin/ads', {
+          method: 'DELETE',
+          headers: { 'x-admin-password': password }
+        }).then(function(r){ return r.json(); }).then(function(d){
+          if (cb) cb(d.ok ? null : (d.error || 'Failed'));
+        }).catch(function(e){ if (cb) cb(e.message); });
+      }
+
+      function socialIcon(platform) {
+        var p = (platform || '').toLowerCase();
+        if (p === 'twitter' || p === 'x') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.766l7.73-8.835L1.254 2.25H8.08l4.265 5.638L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>';
+        if (p === 'telegram') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>';
+        if (p === 'discord') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.08.11 18.1.127 18.11a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>';
+        if (p === 'website' || p === 'web' || p === 'homepage') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+      }
+
+      function buildAdsBanner(pair) {
+        var sym = pair ? (pair.baseToken && pair.baseToken.symbol || 'TOKEN') : '—';
+        var tokenName = pair ? (pair.baseToken && pair.baseToken.name || sym) : '—';
+        var logo = pair && pair.baseToken && pair.baseToken.logoUrl ? pair.baseToken.logoUrl : '';
+        var price = pair ? (parseFloat(pair.priceUsd) || 0) : 0;
+        var chg = pair ? (pair.priceChange && pair.priceChange.h24 != null ? pair.priceChange.h24 : null) : null;
+        var pairAddr = pair ? pair.pairAddress : '';
+        var baseAddr = pair && pair.baseToken ? pair.baseToken.address : '';
+        var marketCap = pair ? (pair.marketCap || pair.fdv || null) : null;
+        var vol24 = pair && pair.volume ? pair.volume.h24 : null;
+        var liq = pair && pair.liquidity ? pair.liquidity.usd : null;
+        var socials = pair && pair.baseToken && Array.isArray(pair.baseToken.socials) ? pair.baseToken.socials : [];
+
+        var priceStr = price >= 1 ? '$' + price.toFixed(2) : price > 0 ? '$' + price.toPrecision(4) : '';
+        var chgStr = chg != null ? (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%' : '';
+        var chgCls = chg != null ? (chg >= 0 ? 'pos' : 'neg') : '';
+
+        var logoHtml = logo
+          ? '<img class="ads-spotlight-logo" src="' + logo + '" onerror="this.style.background=\'rgba(245,158,11,0.15)\';this.style.display=\'flex\';">'
+          : '<div class="ads-spotlight-logo" style="display:flex;align-items:center;justify-content:center;font-size:22px;color:#f59e0b;">★</div>';
+
+        var socialsHtml = '';
+        socials.slice(0, 5).forEach(function(s) {
+          if (s.url) {
+            socialsHtml += '<a class="ads-social-link" href="' + s.url + '" target="_blank" rel="noopener" title="' + (s.platform || 'Link') + '">' + socialIcon(s.platform) + '</a>';
+          }
+        });
+
+        var SUI_ADDR = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI';
+        var cetusUrl = baseAddr
+          ? 'https://app.cetus.zone/swap?from=' + encodeURIComponent(SUI_ADDR) + '&to=' + encodeURIComponent(baseAddr)
+          : 'https://app.cetus.zone/swap';
+        if (pairAddr) cetusUrl += (cetusUrl.indexOf('?') === -1 ? '?' : '&') + 'poolAddress=' + encodeURIComponent(pairAddr);
+
+        var wrap = document.createElement('div');
+        wrap.id = 'ads-featured-wrap';
+        wrap.className = 'ads-featured-wrap';
+        wrap.innerHTML =
+          '<div class="ads-spotlight-card">' +
+            '<div class="ads-spotlight-topbar">' +
+              '<span class="ads-label">★ FEATURED ADS</span>' +
+              (pairAddr ? '<a href="/pair/' + pairAddr + '" style="font-size:11px;color:hsl(var(--muted-foreground));margin-left:8px;text-decoration:none;">View Chart →</a>' : '') +
+              '<span class="ads-spotlight-ad-tag">AD</span>' +
+            '</div>' +
+            '<div class="ads-spotlight-body">' +
+              '<div class="ads-spotlight-token">' +
+                logoHtml +
+                '<div class="ads-spotlight-names">' +
+                  '<span class="ads-spotlight-symbol">' + sym + '</span>' +
+                  '<span class="ads-spotlight-fullname">' + tokenName + '</span>' +
+                  (priceStr
+                    ? '<div class="ads-spotlight-price-row">' +
+                        '<span class="ads-spotlight-price">' + priceStr + '</span>' +
+                        (chgStr ? '<span class="ads-spotlight-chg ' + chgCls + '">' + chgStr + '</span>' : '') +
+                      '</div>'
+                    : '') +
+                '</div>' +
+              '</div>' +
+              '<div class="ads-spotlight-divider"></div>' +
+              '<div class="ads-spotlight-stats">' +
+                (marketCap != null
+                  ? '<div class="ads-sstat"><span class="ads-sstat-lbl">Market Cap</span><span class="ads-sstat-val">' + fmtUSD(marketCap) + '</span></div>'
+                  : '') +
+                (vol24 != null
+                  ? '<div class="ads-sstat"><span class="ads-sstat-lbl">24h Volume</span><span class="ads-sstat-val">' + fmtUSD(vol24) + '</span></div>'
+                  : '') +
+                (liq != null
+                  ? '<div class="ads-sstat"><span class="ads-sstat-lbl">Liquidity</span><span class="ads-sstat-val">' + fmtUSD(liq) + '</span></div>'
+                  : '') +
+              '</div>' +
+              '<div class="ads-spotlight-right">' +
+                (socialsHtml ? '<div class="ads-socials-row">' + socialsHtml + '</div>' : '') +
+                '<a class="ads-buy-btn" href="' + cetusUrl + '" target="_blank" rel="noopener">' +
+                  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>' +
+                  'Buy now on Cetus' +
+                '</a>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+        return wrap;
+      }
+
+      function findStatsBox() {
+        var root2 = document.getElementById('root');
+        if (!root2) return null;
+        // Find the SMALLEST element inside #root that contains both "24h Volume" and "Liquidity"
+        var best = null;
+        var bestLen = Infinity;
+        var all = root2.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (!el.offsetHeight) continue;
+          var txt = el.textContent || '';
+          if (txt.indexOf('24h Volume') !== -1 && txt.indexOf('Liquidity') !== -1 && txt.length < bestLen) {
+            bestLen = txt.length;
+            best = el;
+          }
+        }
+        return best;
+      }
+
+      function findTrendingSection() {
+        // Find the exact "Trending SUI Pairs" heading element (not nav links)
+        var root2 = document.getElementById('root');
+        if (!root2) return null;
+        var all = root2.querySelectorAll('*');
+        var best = null;
+        var bestLen = Infinity;
+        for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (!el.offsetHeight) continue;
+          // Must contain the exact heading phrase — not nav links
+          var direct = (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3)
+            ? el.textContent.trim()
+            : '';
+          var txt = el.textContent || '';
+          // Match the specific heading text, and ensure we're not inside <nav> or <a>
+          if (
+            txt.indexOf('Trending SUI Pairs') !== -1 &&
+            txt.length < bestLen &&
+            el.tagName !== 'A' &&
+            !el.closest('nav') &&
+            !el.closest('header')
+          ) {
+            bestLen = txt.length;
+            best = el;
+          }
+        }
+        return best;
+      }
+
+      function findPairHeaderSection() {
+        // On pair pages, find the token header area (contains token name + price + chart timeframe)
+        var root2 = document.getElementById('root');
+        if (!root2) return null;
+        // Look for the chart container or the timeframe buttons row (1m, 5m, 15m, 1h, 4h, 1D)
+        var all = root2.querySelectorAll('*');
+        var best = null;
+        var bestLen = Infinity;
+        for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (!el.offsetHeight) continue;
+          var txt = el.textContent || '';
+          if (
+            txt.indexOf('15m') !== -1 && txt.indexOf('1h') !== -1 && txt.indexOf('4h') !== -1 &&
+            txt.length < bestLen && el.tagName !== 'A'
+          ) {
+            bestLen = txt.length;
+            best = el;
+          }
+        }
+        return best;
+      }
+
+      function injectAdsBanner() {
+        if (!adsData || !adsData.tokenAddress) {
+          var old = document.getElementById('ads-featured-wrap');
+          if (old) old.remove();
+          adsBannerInjected = false;
+          return;
+        }
+        if (adsBannerInjected && document.getElementById('ads-featured-wrap')) return;
+        var existing = document.getElementById('ads-featured-wrap');
+        if (existing) existing.remove();
+        var banner = buildAdsBanner(adsData.pair || null);
+
+        var isPair = !!getPairFromURL();
+
+        if (isPair) {
+          // On pair detail pages: inject ABOVE the timeframe bar (between header and chart)
+          var chartBar = findPairHeaderSection();
+          if (chartBar && chartBar.parentNode && chartBar.parentNode.nodeType === 1) {
+            chartBar.parentNode.insertBefore(banner, chartBar);
+            adsBannerInjected = true;
+            return;
+          }
+        } else {
+          // On home/trending page: inject above the "Trending SUI Pairs" section
+          var trendingEl = findTrendingSection();
+          if (trendingEl && trendingEl.parentNode && trendingEl.parentNode.nodeType === 1) {
+            trendingEl.parentNode.insertBefore(banner, trendingEl);
+            adsBannerInjected = true;
+            return;
+          }
+        }
+
+        // Fallback: insert after stats box
+        var statsBox = findStatsBox();
+        if (!statsBox) return;
+        var parent = statsBox.parentNode;
+        if (parent && parent.nodeType === 1 && parent !== document.documentElement && parent !== document.head) {
+          parent.insertBefore(banner, statsBox.nextSibling);
+          adsBannerInjected = true;
+        }
+      }
+
+      function renderAdsManager(container, currentAddr) {
+        var addrInput, pwdInput, msgEl;
+        container.innerHTML =
+          '<div class="ads-mgr-hdr">' +
+            '<span style="font-size:16px;">★</span>' +
+            '<span class="ads-mgr-title">ADS Token Manager</span>' +
+          '</div>' +
+          '<div class="ads-mgr-body">' +
+            (currentAddr
+              ? '<div class="ads-current-box">' +
+                  '<span class="ads-current-lbl">CURRENT ADS:</span>' +
+                  '<span class="ads-current-addr">' + currentAddr + '</span>' +
+                '</div>'
+              : '<div style="font-size:12px;color:hsl(var(--muted-foreground));margin-bottom:14px;">No token currently set as ADS.</div>') +
+            '<div class="ads-mgr-row">' +
+              '<div class="ads-mgr-lbl">Token Pair Address</div>' +
+              '<input id="ads-addr-input" class="ads-mgr-input" placeholder="0x..." value="' + (currentAddr || '') + '">' +
+            '</div>' +
+            '<div class="ads-mgr-row">' +
+              '<div class="ads-mgr-lbl">Admin Password</div>' +
+              '<input id="ads-pwd-input" class="ads-mgr-input" type="password" placeholder="Enter admin password">' +
+            '</div>' +
+            '<div id="ads-mgr-msg" class="ads-mgr-msg"></div>' +
+            '<div class="ads-mgr-actions">' +
+              '<button id="ads-set-btn" class="ads-mgr-btn set">★ Set as ADS Token</button>' +
+              (currentAddr ? '<button id="ads-clr-btn" class="ads-mgr-btn clr">✕ Clear ADS</button>' : '') +
+            '</div>' +
+          '</div>';
+
+        var setBtn = container.querySelector('#ads-set-btn');
+        var clrBtn = container.querySelector('#ads-clr-btn');
+        msgEl = container.querySelector('#ads-mgr-msg');
+
+        if (setBtn) {
+          setBtn.addEventListener('click', function () {
+            addrInput = container.querySelector('#ads-addr-input');
+            pwdInput = container.querySelector('#ads-pwd-input');
+            var addr = (addrInput && addrInput.value.trim()) || '';
+            var pwd = (pwdInput && pwdInput.value.trim()) || '';
+            if (!addr) { msgEl.className = 'ads-mgr-msg err'; msgEl.textContent = 'Please enter a token address.'; return; }
+            if (!pwd) { msgEl.className = 'ads-mgr-msg err'; msgEl.textContent = 'Please enter the admin password.'; return; }
+            setBtn.textContent = 'Setting…'; setBtn.disabled = true;
+            setAdsTokenAPI(addr, pwd, function (err) {
+              setBtn.textContent = '★ Set as ADS Token'; setBtn.disabled = false;
+              if (err) {
+                msgEl.className = 'ads-mgr-msg err'; msgEl.textContent = err === 'Unauthorized' ? 'Wrong password.' : ('Error: ' + err);
+              } else {
+                msgEl.className = 'ads-mgr-msg ok'; msgEl.textContent = '✓ ADS token updated!';
+                adsData = { tokenAddress: addr, pair: null };
+                adsBannerInjected = false;
+                fetchAdsData(function(d){ adsData = d; adsBannerInjected = false; injectAdsBanner(); });
+                setTimeout(function(){
+                  adsManagerInjected = false;
+                  injectAdsManager();
+                }, 800);
+              }
+            });
+          });
+        }
+        if (clrBtn) {
+          clrBtn.addEventListener('click', function () {
+            pwdInput = container.querySelector('#ads-pwd-input');
+            var pwd = (pwdInput && pwdInput.value.trim()) || '';
+            if (!pwd) { msgEl.className = 'ads-mgr-msg err'; msgEl.textContent = 'Please enter the admin password.'; return; }
+            clrBtn.textContent = 'Clearing…'; clrBtn.disabled = true;
+            clearAdsTokenAPI(pwd, function (err) {
+              clrBtn.textContent = '✕ Clear ADS'; clrBtn.disabled = false;
+              if (err) {
+                msgEl.className = 'ads-mgr-msg err'; msgEl.textContent = err === 'Unauthorized' ? 'Wrong password.' : ('Error: ' + err);
+              } else {
+                msgEl.className = 'ads-mgr-msg ok'; msgEl.textContent = '✓ ADS token cleared.';
+                adsData = { tokenAddress: null, pair: null };
+                adsBannerInjected = false; injectAdsBanner();
+                setTimeout(function(){ adsManagerInjected = false; injectAdsManager(); }, 600);
+              }
+            });
+          });
+        }
+      }
+
+      function injectAdsManager() {
+        if (!/\/admin/.test(window.location.pathname)) return;
+        if (adsManagerInjected && document.getElementById('sui-ads-manager')) return;
+        var root2 = document.getElementById('root');
+        if (!root2 || root2.children.length === 0) return;
+        var existing = document.getElementById('sui-ads-manager');
+        if (existing) existing.remove();
+        var panel = document.createElement('div');
+        panel.id = 'sui-ads-manager';
+        var card = document.createElement('div');
+        card.className = 'ads-mgr-card';
+        panel.appendChild(card);
+        var currentAddr = adsData ? adsData.tokenAddress : null;
+        renderAdsManager(card, currentAddr);
+
+        // Insert inside the page content area (after the header), not before the React root
+        var inserted = false;
+        var main = root2.querySelector('main');
+        if (main) {
+          main.insertBefore(panel, main.firstChild);
+          inserted = true;
+        }
+        if (!inserted) {
+          var reactWrapper = root2.firstChild;
+          if (reactWrapper) {
+            // Look for a non-header content child
+            var children = Array.prototype.slice.call(reactWrapper.children);
+            var contentArea = null;
+            for (var ci = 0; ci < children.length; ci++) {
+              var tag = children[ci].tagName.toLowerCase();
+              if (tag !== 'header' && tag !== 'nav' && children[ci].offsetHeight > 20) {
+                contentArea = children[ci];
+                break;
+              }
+            }
+            if (contentArea) {
+              contentArea.insertBefore(panel, contentArea.firstChild);
+            } else {
+              reactWrapper.appendChild(panel);
+            }
+            inserted = true;
+          }
+        }
+        if (!inserted) {
+          root2.appendChild(panel);
+        }
+        adsManagerInjected = true;
+      }
+
+      function injectAdsPairButton(pairAddress) {
+        if (adsPairBtnInjected === pairAddress && document.getElementById('ads-pair-btn-' + pairAddress)) return;
+        var oldBtn = document.querySelector('.ads-pair-btn[data-pair]');
+        if (oldBtn) oldBtn.remove();
+        var tradeBtn = null;
+        var btns = document.querySelectorAll('button, a');
+        for (var i = 0; i < btns.length; i++) {
+          if (/trade/i.test(btns[i].textContent)) { tradeBtn = btns[i]; break; }
+        }
+        if (!tradeBtn) return;
+        var isActive = adsData && adsData.tokenAddress && adsData.tokenAddress.toLowerCase() === pairAddress.toLowerCase();
+        var btn = document.createElement('button');
+        btn.className = 'ads-pair-btn' + (isActive ? ' active' : '');
+        btn.id = 'ads-pair-btn-' + pairAddress;
+        btn.setAttribute('data-pair', pairAddress);
+        btn.textContent = isActive ? '★ ADS Active' : '★ Set as ADS';
+        btn.title = 'Feature this token in the ADS banner';
+        btn.addEventListener('click', function () {
+          var pwd = window.prompt('Enter admin password to set this token as ADS:');
+          if (!pwd) return;
+          btn.textContent = 'Setting…'; btn.disabled = true;
+          setAdsTokenAPI(pairAddress, pwd, function (err) {
+            btn.disabled = false;
+            if (err) {
+              alert(err === 'Unauthorized' ? 'Wrong admin password.' : 'Error: ' + err);
+              btn.textContent = isActive ? '★ ADS Active' : '★ Set as ADS';
+            } else {
+              btn.className = 'ads-pair-btn active';
+              btn.textContent = '★ ADS Active';
+              isActive = true;
+              adsPairBtnInjected = pairAddress;
+              adsData = { tokenAddress: pairAddress, pair: null };
+              adsBannerInjected = false;
+              fetchAdsData(function(d){ adsData = d; adsBannerInjected = false; injectAdsBanner(); });
+            }
+          });
+        });
+        var parent = tradeBtn.parentNode;
+        if (parent) parent.insertBefore(btn, tradeBtn.nextSibling);
+        adsPairBtnInjected = pairAddress;
+      }
+      // ── End ADS System ───────────────────────────────────────────────────────
+
+      function getPairFromURL() {
+        var m = window.location.pathname.match(/\/pair\/([^/?#]+)/);
+        return m ? m[1] : null;
+      }
+
+      function check() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+          var pair = getPairFromURL();
+          var isAdmin = /\/admin/.test(window.location.pathname);
+
+          // ADS: always run banner + manager injections
+          injectAdsBanner();
+          if (isAdmin) injectAdsManager();
+
+          if (!pair) {
+            injectedPair = null;
+            injectedChart = null;
+            var old = document.getElementById('dex-chart-frame');
+            if (old) old.remove();
+            return;
+          }
+
+          // chart injection
+          var frameExists = !!document.getElementById('dex-chart-frame');
+          if (pair !== injectedChart || !frameExists) {
+            if (!frameExists) injectedChart = null;
+            var old2 = document.getElementById('dex-chart-frame');
+            if (old2) { old2.remove(); injectedChart = null; }
+            tryInjectChart(pair, 0);
+          }
+
+          // stats box injection
+          var hasStats = !!document.getElementById('sui-stats-box');
+          if (pair !== injectedPair || !hasStats) {
+            if (pair !== injectedPair) injectedPair = null;
+            injectSections(pair);
+          }
+
+          // ADS button on pair pages
+          injectAdsPairButton(pair);
+        }, 150);
+      }
+
+      var root = document.getElementById('root') || document.body;
+      new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          if (muts[i].addedNodes.length > 0) { check(); break; }
+        }
+      }).observe(root, { childList: true, subtree: true });
+
+      var origPush = history.pushState.bind(history);
+      history.pushState = function () {
+        origPush.apply(history, arguments);
+        injectedPair = null;
+        adsBannerInjected = false;
+        adsManagerInjected = false;
+        adsPairBtnInjected = null;
+        check();
+      };
+      window.addEventListener('popstate', function () {
+        injectedPair = null;
+        adsBannerInjected = false;
+        adsManagerInjected = false;
+        adsPairBtnInjected = null;
+        check();
+      });
+
+      // Bootstrap ADS data then start
+      fetchAdsData(function() { setTimeout(check, 1000); });
+    })();
+    </script>
+  </body>
+</html>

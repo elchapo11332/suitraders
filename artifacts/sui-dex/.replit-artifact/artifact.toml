@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SUI DEX Screener"
+version = "1.0.0"
+id = "artifacts/sui-dex"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 5000
+
+[services.development]
+run = "pnpm --filter @workspace/sui-dex run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/sui-dex", "run", "build" ]
+publicDir = "artifacts/sui-dex/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "5000"
+BASE_PATH = "/"
