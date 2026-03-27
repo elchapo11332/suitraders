@@ -255,6 +255,35 @@ async function fetchGeckoTrending(): Promise<{ pools: unknown[]; included: unkno
   }
 }
 
+let geckoNewCache: unknown[] | null = null;
+let geckoNewIncluded: unknown[] | null = null;
+let geckoNewExpiry = 0;
+
+async function fetchGeckoNewPools(): Promise<{ pools: unknown[]; included: unknown[] }> {
+  if (geckoNewCache && Date.now() < geckoNewExpiry) return { pools: geckoNewCache, included: geckoNewIncluded || [] };
+  try {
+    const pages = await Promise.allSettled([
+      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=1") as Promise<{ data?: unknown[]; included?: unknown[] }>,
+      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=2") as Promise<{ data?: unknown[]; included?: unknown[] }>,
+      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=3") as Promise<{ data?: unknown[]; included?: unknown[] }>,
+    ]);
+    const pools: unknown[] = [];
+    const included: unknown[] = [];
+    for (const r of pages) {
+      if (r.status === "fulfilled") {
+        pools.push(...(r.value.data || []));
+        included.push(...(r.value.included || []));
+      }
+    }
+    geckoNewCache = pools;
+    geckoNewIncluded = included;
+    geckoNewExpiry = Date.now() + 30_000;
+    return { pools, included };
+  } catch {
+    return { pools: geckoNewCache || [], included: geckoNewIncluded || [] };
+  }
+}
+
 async function fetchAllPairs(): Promise<Pair[]> {
   if (mergedCache && Date.now() < mergedExpiry) return mergedCache;
   const [raidenRaw, { pools: geckoRaw, included }] = await Promise.allSettled([
@@ -545,6 +574,22 @@ router.get("/tokens", async (req, res) => {
     res.json(pairs.slice(0, limit));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch tokens");
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/new-pairs", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt((req.query.limit as string) || "60"), 100);
+    const { pools, included } = await fetchGeckoNewPools();
+    const pairs = (pools as Record<string, unknown>[]).map((p) =>
+      formatGeckoPair(p, included as Record<string, unknown>[])
+    );
+    // Sort newest first (pool_created_at descending)
+    pairs.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    res.json(pairs.slice(0, limit));
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch new pairs");
     res.status(500).json({ error: (err as Error).message });
   }
 });
