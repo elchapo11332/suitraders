@@ -587,6 +587,28 @@
         return best;
       }
 
+      function findSectionAncestor(el) {
+        // Walk up the DOM from the heading element to find the section-level container.
+        // We want to find the ancestor whose SIBLING (or close relative) includes the pairs table,
+        // so we insert the banner before the whole section — not inside the heading's flex row.
+        var cur = el;
+        while (cur && cur.parentNode && cur.parentNode.nodeType === 1) {
+          var parent = cur.parentNode;
+          if (parent.id === 'root' || parent.tagName === 'BODY' || parent.tagName === 'HTML') break;
+          // Check if any sibling of cur (within parent) contains a tbody (the pairs table)
+          var siblings = Array.prototype.slice.call(parent.children);
+          var siblingHasTable = siblings.some(function(sib) {
+            return sib !== cur && (sib.tagName === 'TABLE' || sib.tagName === 'TBODY' || sib.querySelector('tbody'));
+          });
+          if (siblingHasTable) {
+            // cur is at the right level — its sibling is the table, so insert before cur
+            return cur;
+          }
+          cur = parent;
+        }
+        return el;
+      }
+
       function injectAdsBanner() {
         if (!adsData || !adsData.tokenAddress) {
           var old = document.getElementById('ads-featured-wrap');
@@ -610,12 +632,18 @@
             return;
           }
         } else {
-          // On home/trending page: inject above the "Trending SUI Pairs" section
+          // On home/trending page: inject above the whole "Trending SUI Pairs" section
           var trendingEl = findTrendingSection();
-          if (trendingEl && trendingEl.parentNode && trendingEl.parentNode.nodeType === 1) {
-            trendingEl.parentNode.insertBefore(banner, trendingEl);
-            adsBannerInjected = true;
-            return;
+          if (trendingEl) {
+            // Walk up to the section-level ancestor so we insert before the heading+table block,
+            // not inside the heading's own flex row (which would hide the title).
+            var insertTarget = findSectionAncestor(trendingEl);
+            var insertParent = insertTarget.parentNode;
+            if (insertParent && insertParent.nodeType === 1) {
+              insertParent.insertBefore(banner, insertTarget);
+              adsBannerInjected = true;
+              return;
+            }
           }
         }
 
