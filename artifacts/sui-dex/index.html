@@ -200,6 +200,15 @@
       }
       .ads-pair-btn:hover { background: rgba(245,158,11,0.2); }
       .ads-pair-btn.active { background: rgba(245,158,11,0.22); border-color: #f59e0b; }
+      /* ── Admin contact link on pair pages ── */
+      .admin-contact-link {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 6px;
+        border: 1px solid rgba(41,182,246,0.38); background: rgba(41,182,246,0.09);
+        color: #29b6f6; text-decoration: none; transition: background 0.2s; vertical-align: middle;
+        white-space: nowrap;
+      }
+      .admin-contact-link:hover { background: rgba(41,182,246,0.2); border-color: rgba(41,182,246,0.6); }
     </style>
   </head>
   <body>
@@ -820,6 +829,39 @@
         if (parent) parent.insertBefore(btn, tradeBtn.nextSibling);
         adsPairBtnInjected = pairAddress;
       }
+      // ── Admin Contact Link on pair pages ─────────────────────────────────────
+      var adminContactInjected = false;
+      function injectAdminContactLink() {
+        if (adminContactInjected && document.getElementById('admin-contact-link')) return;
+        var old = document.getElementById('admin-contact-link');
+        if (old) old.remove();
+        adminContactInjected = false;
+
+        // Find the Trade button to anchor next to
+        var tradeBtn = null;
+        var btns = document.querySelectorAll('button, a');
+        for (var i = 0; i < btns.length; i++) {
+          if (/trade/i.test(btns[i].textContent)) { tradeBtn = btns[i]; break; }
+        }
+        if (!tradeBtn) return;
+
+        var link = document.createElement('a');
+        link.id = 'admin-contact-link';
+        link.className = 'admin-contact-link';
+        link.href = 'http://t.me/darknovachad';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.title = 'Contact admin to advertise this token';
+        link.innerHTML =
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>' +
+          'Advertise';
+
+        var parent = tradeBtn.parentNode;
+        if (parent) {
+          parent.insertBefore(link, tradeBtn.nextSibling);
+          adminContactInjected = true;
+        }
+      }
       // ── End ADS System ───────────────────────────────────────────────────────
 
       function getPairFromURL() {
@@ -863,6 +905,9 @@
 
           // ADS button on pair pages
           injectAdsPairButton(pair);
+
+          // Admin contact (Advertise) link on pair pages
+          injectAdminContactLink();
         }, 150);
       }
 
@@ -880,6 +925,7 @@
         adsBannerInjected = false;
         adsManagerInjected = false;
         adsPairBtnInjected = null;
+        adminContactInjected = false;
         check();
       };
       window.addEventListener('popstate', function () {
@@ -887,6 +933,7 @@
         adsBannerInjected = false;
         adsManagerInjected = false;
         adsPairBtnInjected = null;
+        adminContactInjected = false;
         check();
       });
 
