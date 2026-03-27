@@ -623,16 +623,8 @@
 
         var isPair = !!getPairFromURL();
 
-        if (isPair) {
-          // On pair detail pages: inject ABOVE the timeframe bar (between header and chart)
-          var chartBar = findPairHeaderSection();
-          if (chartBar && chartBar.parentNode && chartBar.parentNode.nodeType === 1) {
-            chartBar.parentNode.insertBefore(banner, chartBar);
-            adsBannerInjected = true;
-            return;
-          }
-        } else {
-          // On home/trending page: inject above the whole "Trending SUI Pairs" section
+        if (!isPair) {
+          // On home/trending page only: inject above the whole "Trending SUI Pairs" section
           var trendingEl = findTrendingSection();
           if (trendingEl) {
             // Walk up to the section-level ancestor so we insert before the heading+table block,
@@ -647,7 +639,8 @@
           }
         }
 
-        // Fallback: insert after stats box
+        // Fallback: only on home page, insert after stats box
+        if (isPair) return;
         var statsBox = findStatsBox();
         if (!statsBox) return;
         var parent = statsBox.parentNode;
