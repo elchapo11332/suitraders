@@ -211,69 +211,21 @@
       .admin-contact-link:hover { background: rgba(41,182,246,0.2); border-color: rgba(41,182,246,0.6); }
       /* ── Hide Admin nav link ── */
       a[href="/admin"], a[href="/admin/"] { display: none !important; }
-      /* ── New Pairs nav link ── */
-      .new-pairs-nav-link {
-        font-size: 14px; font-weight: 500; color: hsl(var(--foreground) / 0.7);
-        text-decoration: none; padding: 4px 0; transition: color 0.15s; cursor: pointer;
-        background: none; border: none;
+      /* ── Social nav links ── */
+      .nav-social-links {
+        display: inline-flex; align-items: center; gap: 8px;
       }
-      .new-pairs-nav-link:hover, .new-pairs-nav-link.active { color: hsl(var(--foreground)); }
-      /* ── New Pairs page ── */
-      #new-pairs-page {
-        position: fixed; inset: 0; z-index: 50; overflow-y: auto;
-        background: hsl(var(--background));
+      .nav-social-link {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 30px; height: 30px; border-radius: 6px;
+        border: 1px solid hsl(var(--border) / 0.5);
+        background: hsl(var(--muted) / 0.4);
+        color: hsl(var(--muted-foreground));
+        text-decoration: none; transition: background 0.15s, color 0.15s, border-color 0.15s;
+        flex-shrink: 0;
       }
-      #new-pairs-page .np-inner {
-        max-width: 1280px; margin: 0 auto; padding: 24px 16px;
-      }
-      #new-pairs-page .np-header {
-        display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
-      }
-      #new-pairs-page .np-title {
-        font-size: 20px; font-weight: 700; color: hsl(var(--foreground));
-      }
-      #new-pairs-page .np-badge {
-        font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px;
-        background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.35);
-      }
-      #new-pairs-page .np-table-wrap {
-        border-radius: 10px; border: 1px solid hsl(var(--border) / 0.5);
-        overflow: hidden; background: hsl(var(--card));
-      }
-      #new-pairs-page table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      #new-pairs-page thead tr { background: hsl(var(--muted) / 0.5); }
-      #new-pairs-page th {
-        text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600;
-        color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: .05em;
-        white-space: nowrap;
-      }
-      #new-pairs-page th:not(:first-child) { text-align: right; }
-      #new-pairs-page td { padding: 10px 12px; border-top: 1px solid hsl(var(--border) / 0.3); white-space: nowrap; }
-      #new-pairs-page td:not(:first-child) { text-align: right; }
-      #new-pairs-page tbody tr:hover { background: hsl(var(--muted) / 0.25); cursor: pointer; }
-      #new-pairs-page .np-token { display: flex; align-items: center; gap: 8px; }
-      #new-pairs-page .np-logo {
-        width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
-        background: hsl(var(--muted)); flex-shrink: 0;
-      }
-      #new-pairs-page .np-logo-placeholder {
-        width: 28px; height: 28px; border-radius: 50%;
-        background: hsl(var(--muted)); flex-shrink: 0; display:flex;align-items:center;justify-content:center;
-        font-size:11px; font-weight:700; color:hsl(var(--muted-foreground));
-      }
-      #new-pairs-page .np-sym { font-weight: 600; color: hsl(var(--foreground)); }
-      #new-pairs-page .np-quote { font-size: 11px; color: hsl(var(--muted-foreground)); }
-      #new-pairs-page .np-dex { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 1px; }
-      #new-pairs-page .np-age { color: hsl(var(--muted-foreground)); font-size: 12px; }
-      #new-pairs-page .np-up { color: #22c55e; }
-      #new-pairs-page .np-down { color: #ef4444; }
-      #new-pairs-page .np-loading {
-        text-align: center; padding: 48px 16px; color: hsl(var(--muted-foreground)); font-size: 14px;
-      }
-      #new-pairs-page .np-dex-badge {
-        display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 4px;
-        background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-weight: 500;
-      }
+      .nav-social-link:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+      .nav-social-link svg { display: block; }
     </style>
   </head>
   <body>
@@ -937,180 +889,56 @@
       }
       // ── End ADS System ───────────────────────────────────────────────────────
 
-      // ── New Pairs nav + page ──────────────────────────────────────────────────
-      var newPairsNavInjected = false;
-      var newPairsPageActive = false;
-
-      function isNewPairsURL() {
-        return window.location.pathname === '/new-pairs' || window.location.pathname === '/new-pairs/';
-      }
-
-      function fmtAge(ts) {
-        if (!ts) return '—';
-        var secs = Math.floor(Date.now() / 1000) - ts;
-        if (secs < 60) return secs + 's';
-        if (secs < 3600) return Math.floor(secs / 60) + 'm';
-        if (secs < 86400) return Math.floor(secs / 3600) + 'h';
-        return Math.floor(secs / 86400) + 'd';
-      }
-
-      function fmtUsd(n) {
-        if (!n) return '$0';
-        if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
-        if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
-        if (n >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K';
-        return '$' + Number(n).toFixed(4);
-      }
-
-      function fmtPrice(s) {
-        var n = parseFloat(s || '0');
-        if (!n) return '$0';
-        if (n >= 0.01) return '$' + n.toFixed(4);
-        var str = n.toFixed(12).replace(/0+$/, '');
-        return '$' + str;
-      }
-
-      function injectNewPairsNav() {
-        if (newPairsNavInjected && document.getElementById('new-pairs-nav-btn')) return;
-        var old = document.getElementById('new-pairs-nav-btn');
-        if (old) old.remove();
-
-        // Find the "Trending" nav link to anchor next to
-        var trendingLink = null;
-        var allLinks = document.querySelectorAll('a, button');
-        for (var i = 0; i < allLinks.length; i++) {
-          if (/^trending$/i.test(allLinks[i].textContent.trim())) {
-            trendingLink = allLinks[i]; break;
-          }
-        }
-        if (!trendingLink) return;
-
-        var btn = document.createElement('button');
-        btn.id = 'new-pairs-nav-btn';
-        btn.className = 'new-pairs-nav-link' + (isNewPairsURL() ? ' active' : '');
-        btn.textContent = 'New Pairs';
-        btn.addEventListener('click', function () {
-          if (isNewPairsURL()) return;
-          history.pushState(null, '', '/new-pairs');
-          injectNewPairsPage();
-        });
-
-        var parent = trendingLink.parentNode;
-        if (parent) {
-          parent.insertBefore(btn, trendingLink.nextSibling);
-          newPairsNavInjected = true;
-        }
-      }
-
-      function removeNewPairsPage() {
-        var el = document.getElementById('new-pairs-page');
-        if (el) el.remove();
-        newPairsPageActive = false;
-      }
-
-      function injectNewPairsPage() {
-        if (newPairsPageActive && document.getElementById('new-pairs-page')) return;
-        removeNewPairsPage();
-
-        var page = document.createElement('div');
-        page.id = 'new-pairs-page';
-        page.innerHTML = '<div class="np-inner">' +
-          '<div class="np-header">' +
-            '<span class="np-title">New Pairs</span>' +
-            '<span class="np-badge">LIVE</span>' +
-          '</div>' +
-          '<div class="np-table-wrap">' +
-            '<div class="np-loading">Loading new pairs…</div>' +
-          '</div>' +
-        '</div>';
-        document.body.appendChild(page);
-        newPairsPageActive = true;
-
-        // Update nav link active state
-        var navBtn = document.getElementById('new-pairs-nav-btn');
-        if (navBtn) navBtn.classList.add('active');
-
-        // Fetch new pairs data
-        fetch('/api/new-pairs?limit=60')
-          .then(function(r) { return r.json(); })
-          .then(function(pairs) {
-            var wrap = page.querySelector('.np-table-wrap');
-            if (!wrap) return;
-            if (!pairs || pairs.length === 0) {
-              wrap.innerHTML = '<div class="np-loading">No new pairs found.</div>';
-              return;
-            }
-            var rows = pairs.map(function(p, i) {
-              var sym = (p.baseToken && p.baseToken.symbol) || '???';
-              var quoteSym = (p.quoteToken && p.quoteToken.symbol) || '';
-              var logo = (p.baseToken && p.baseToken.logoUrl) || '';
-              var logoEl = logo
-                ? '<img class="np-logo" src="' + logo + '" onerror="this.style.display=\'none\'" />'
-                : '<div class="np-logo-placeholder">' + sym.charAt(0) + '</div>';
-              var chg = p.priceChange && p.priceChange.h24 != null ? p.priceChange.h24 : null;
-              var chgEl = chg == null ? '—'
-                : '<span class="' + (chg >= 0 ? 'np-up' : 'np-down') + '">' +
-                  (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%</span>';
-              var dexName = (p.dexId || '').replace(/_/g, ' ');
-              return '<tr data-pair="' + (p.pairAddress || '') + '">' +
-                '<td style="width:40px;text-align:right;color:hsl(var(--muted-foreground))">' + (i+1) + '</td>' +
-                '<td>' +
-                  '<div class="np-token">' + logoEl +
-                    '<div>' +
-                      '<div><span class="np-sym">' + sym + '</span> <span class="np-quote">/ ' + quoteSym + '</span></div>' +
-                      '<div class="np-dex"><span class="np-dex-badge">' + dexName + '</span></div>' +
-                    '</div>' +
-                  '</div>' +
-                '</td>' +
-                '<td>' + fmtPrice(p.priceUsd) + '</td>' +
-                '<td>' + chgEl + '</td>' +
-                '<td>' + fmtUsd(p.volume && p.volume.h24) + '</td>' +
-                '<td>' + fmtUsd(p.liquidity && p.liquidity.usd) + '</td>' +
-                '<td>' + fmtUsd(p.marketCap) + '</td>' +
-                '<td class="np-age">' + fmtAge(p.createdAt) + '</td>' +
-              '</tr>';
-            }).join('');
-
-            wrap.innerHTML = '<table>' +
-              '<thead><tr>' +
-                '<th style="width:40px">#</th>' +
-                '<th>Pair</th>' +
-                '<th>Price</th>' +
-                '<th>24h %</th>' +
-                '<th>24h Vol</th>' +
-                '<th>Liquidity</th>' +
-                '<th>Mkt Cap</th>' +
-                '<th>Age</th>' +
-              '</tr></thead>' +
-              '<tbody>' + rows + '</tbody>' +
-            '</table>';
-
-            // Row click → navigate to pair detail
-            var trs = wrap.querySelectorAll('tbody tr');
-            for (var i = 0; i < trs.length; i++) {
-              (function(tr) {
-                tr.addEventListener('click', function() {
-                  var addr = tr.getAttribute('data-pair');
-                  if (addr) {
-                    removeNewPairsPage();
-                    history.pushState(null, '', '/pair/' + addr);
-                    var navBtn2 = document.getElementById('new-pairs-nav-btn');
-                    if (navBtn2) navBtn2.classList.remove('active');
-                  }
-                });
-              })(trs[i]);
-            }
-          })
-          .catch(function() {
-            var wrap = page.querySelector('.np-table-wrap');
-            if (wrap) wrap.innerHTML = '<div class="np-loading">Failed to load new pairs.</div>';
-          });
-      }
-      // ── End New Pairs ─────────────────────────────────────────────────────────
-
       function getPairFromURL() {
         var m = window.location.pathname.match(/\/pair\/([^/?#]+)/);
         return m ? m[1] : null;
+      }
+
+      // ── Social Nav Links (X and Telegram) ────────────────────────────────────
+      var socialLinksInjected = false;
+      function injectSocialLinks() {
+        if (socialLinksInjected && document.getElementById('nav-social-links')) return;
+        var old = document.getElementById('nav-social-links');
+        if (old) { old.remove(); socialLinksInjected = false; }
+
+        // Find the nav element (header contains the logo + nav links)
+        var nav = document.querySelector('header nav, header > div > nav, header');
+        if (!nav) return;
+
+        // Build the wrapper
+        var wrapper = document.createElement('div');
+        wrapper.id = 'nav-social-links';
+        wrapper.className = 'nav-social-links';
+
+        // X (Twitter) icon
+        var xLink = document.createElement('a');
+        xLink.className = 'nav-social-link';
+        xLink.href = 'https://x.com/suidexscreener';
+        xLink.target = '_blank';
+        xLink.rel = 'noopener noreferrer';
+        xLink.title = 'Follow on X';
+        xLink.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.74-8.855L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>';
+        wrapper.appendChild(xLink);
+
+        // Telegram icon
+        var tgLink = document.createElement('a');
+        tgLink.className = 'nav-social-link';
+        tgLink.href = 'https://t.me/suidexscreener';
+        tgLink.target = '_blank';
+        tgLink.rel = 'noopener noreferrer';
+        tgLink.title = 'Join Telegram';
+        tgLink.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>';
+        wrapper.appendChild(tgLink);
+
+        // Inject: try to place after the last nav <a> link, or append to nav
+        var navLinks = nav.querySelectorAll('a');
+        var lastNavLink = navLinks.length > 0 ? navLinks[navLinks.length - 1] : null;
+        if (lastNavLink && lastNavLink.parentNode) {
+          lastNavLink.parentNode.insertBefore(wrapper, lastNavLink.nextSibling);
+        } else {
+          nav.appendChild(wrapper);
+        }
+        socialLinksInjected = true;
       }
 
       function check() {
@@ -1118,20 +946,9 @@
         debounceTimer = setTimeout(function () {
           var pair = getPairFromURL();
           var isAdmin = /\/admin/.test(window.location.pathname);
-          var isNewPairs = isNewPairsURL();
 
-          // Always inject the New Pairs nav link
-          injectNewPairsNav();
-
-          // Handle New Pairs page view
-          if (isNewPairs) {
-            injectNewPairsPage();
-            return;
-          } else {
-            removeNewPairsPage();
-            var navBtn3 = document.getElementById('new-pairs-nav-btn');
-            if (navBtn3) navBtn3.classList.remove('active');
-          }
+          // Social links always present in nav
+          injectSocialLinks();
 
           // ADS: always run banner + manager injections
           injectAdsBanner();
@@ -1181,8 +998,7 @@
         adsManagerInjected = false;
         adsPairBtnInjected = null;
         adminContactInjected = false;
-        newPairsNavInjected = false;
-        newPairsPageActive = false;
+        socialLinksInjected = false;
         check();
       };
       window.addEventListener('popstate', function () {
@@ -1191,8 +1007,7 @@
         adsManagerInjected = false;
         adsPairBtnInjected = null;
         adminContactInjected = false;
-        newPairsNavInjected = false;
-        newPairsPageActive = false;
+        socialLinksInjected = false;
         check();
       });
 

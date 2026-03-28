@@ -255,35 +255,6 @@ async function fetchGeckoTrending(): Promise<{ pools: unknown[]; included: unkno
   }
 }
 
-let geckoNewCache: unknown[] | null = null;
-let geckoNewIncluded: unknown[] | null = null;
-let geckoNewExpiry = 0;
-
-async function fetchGeckoNewPools(): Promise<{ pools: unknown[]; included: unknown[] }> {
-  if (geckoNewCache && Date.now() < geckoNewExpiry) return { pools: geckoNewCache, included: geckoNewIncluded || [] };
-  try {
-    const pages = await Promise.allSettled([
-      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=1") as Promise<{ data?: unknown[]; included?: unknown[] }>,
-      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=2") as Promise<{ data?: unknown[]; included?: unknown[] }>,
-      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=3") as Promise<{ data?: unknown[]; included?: unknown[] }>,
-    ]);
-    const pools: unknown[] = [];
-    const included: unknown[] = [];
-    for (const r of pages) {
-      if (r.status === "fulfilled") {
-        pools.push(...(r.value.data || []));
-        included.push(...(r.value.included || []));
-      }
-    }
-    geckoNewCache = pools;
-    geckoNewIncluded = included;
-    geckoNewExpiry = Date.now() + 30_000;
-    return { pools, included };
-  } catch {
-    return { pools: geckoNewCache || [], included: geckoNewIncluded || [] };
-  }
-}
-
 async function fetchAllPairs(): Promise<Pair[]> {
   if (mergedCache && Date.now() < mergedExpiry) return mergedCache;
   const [raidenRaw, { pools: geckoRaw, included }] = await Promise.allSettled([
@@ -517,6 +488,42 @@ function formatRaidenTx(tx: Record<string, unknown>, pair: Pair) {
   };
 }
 
+async function fetchGeckoTrades(poolAddress: string, limit: number): Promise<unknown[]> {
+  try {
+    const data = await geckoFetch(
+      `/networks/sui-network/pools/${poolAddress}/trades?trade_volume_in_usd_greater_than=0`
+    ) as { data?: unknown[] };
+    return (data.data || []).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+function formatGeckoTrade(trade: Record<string, unknown>, pair: Pair) {
+  const attrs = trade.attributes as Record<string, unknown> || {};
+  const kind = (attrs.kind as string || "buy").toLowerCase();
+  const volumeUsd = parseFloat((attrs.volume_in_usd as string) || "0");
+  const fromAmt = parseFloat((attrs.from_token_amount as string) || "0");
+  const toAmt = parseFloat((attrs.to_token_amount as string) || "0");
+  const timestamp = attrs.block_timestamp
+    ? Math.floor(new Date(attrs.block_timestamp as string).getTime() / 1000)
+    : Math.floor(Date.now() / 1000);
+  const isBuy = kind === "buy";
+  return {
+    txHash: (attrs.tx_hash as string) || `gecko-${Math.random().toString(36).slice(2)}`,
+    type: isBuy ? "buy" : "sell",
+    pairAddress: pair.pairAddress,
+    baseToken: { address: pair.baseToken.address, name: pair.baseToken.name, symbol: pair.baseToken.symbol, logoUrl: null },
+    quoteToken: { address: pair.quoteToken.address, name: pair.quoteToken.name, symbol: pair.quoteToken.symbol, logoUrl: null },
+    priceUsd: (attrs.price_from_in_usd as string) || pair.priceUsd || "0",
+    amountBase: isBuy ? toAmt : fromAmt,
+    amountQuote: isBuy ? fromAmt : toAmt,
+    amountUsd: volumeUsd,
+    maker: (attrs.tx_from_address as string) || "",
+    timestamp,
+  };
+}
+
 function generateMock(pair: Pair, count: number) {
   const now = Math.floor(Date.now() / 1000);
   const price = parseFloat(pair.priceUsd || "0.001") || 0.001;
@@ -574,22 +581,6 @@ router.get("/tokens", async (req, res) => {
     res.json(pairs.slice(0, limit));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch tokens");
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-router.get("/new-pairs", async (req, res) => {
-  try {
-    const limit = Math.min(parseInt((req.query.limit as string) || "60"), 100);
-    const { pools, included } = await fetchGeckoNewPools();
-    const pairs = (pools as Record<string, unknown>[]).map((p) =>
-      formatGeckoPair(p, included as Record<string, unknown>[])
-    );
-    // Sort newest first (pool_created_at descending)
-    pairs.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-    res.json(pairs.slice(0, limit));
-  } catch (err) {
-    req.log.error({ err }, "Failed to fetch new pairs");
     res.status(500).json({ error: (err as Error).message });
   }
 });
@@ -671,31 +662,55 @@ router.get("/transactions", async (req, res) => {
     const pairAddress = req.query.pairAddress as string | undefined;
     const limit = Math.min(parseInt((req.query.limit as string) || "50"), 100);
     if (pairAddress) {
-      const pairs = await fetchAllPairs().catch(() => []);
-      const found = pairs.find((p) => (p.pairAddress || "").toLowerCase() === pairAddress.toLowerCase());
+      // Resolve the pair — check cache first, then fall back to direct lookups
+      const pairs = await fetchAllPairs().catch(() => [] as Pair[]);
+      let found = pairs.find((p) => (p.pairAddress || "").toLowerCase() === pairAddress.toLowerCase());
+      if (!found) {
+        try {
+          const direct = await raidenFetch(`/pairs/${pairAddress}`) as Record<string, unknown>;
+          if (direct?.poolId) found = formatRaidenPair(direct);
+        } catch { /* ignore */ }
+      }
+      if (!found) {
+        try {
+          const geckoData = await geckoFetch(`/networks/sui-network/pools/${pairAddress}?include=base_token,quote_token`) as { data?: Record<string, unknown>; included?: Record<string, unknown>[] };
+          if (geckoData?.data) found = formatGeckoPair(geckoData.data, geckoData.included || []);
+        } catch { /* ignore */ }
+      }
+
       if (found) {
+        // 1. Try RaidenX real transactions
         const raidenTxs = await fetchRaidenTransactions(pairAddress, limit);
-        if (raidenTxs.length >= 5) {
-          res.json((raidenTxs as Record<string, unknown>[]).map((tx) => formatRaidenTx(tx, found)));
+        if (raidenTxs.length >= 3) {
+          res.json((raidenTxs as Record<string, unknown>[]).map((tx) => formatRaidenTx(tx, found!)));
           return;
         }
+
+        // 2. Try GeckoTerminal trades (real on-chain data)
+        const geckoTrades = await fetchGeckoTrades(pairAddress, limit);
+        if (geckoTrades.length >= 1) {
+          const formatted = (geckoTrades as Record<string, unknown>[]).map((t) => formatGeckoTrade(t, found!));
+          res.json(formatted.sort((a, b) => b.timestamp - a.timestamp));
+          return;
+        }
+
+        // 3. Cetus on-chain events
         if (found.dexId === "cetus") {
           const events = await fetchRecentCetusEvents();
-          const realTxns = (events as CetusEvent[]).map((ev) => parseCetusEvent(ev, found)).filter(Boolean).slice(0, limit);
-          if (realTxns.length >= 3) { res.json(realTxns); return; }
-          const mock = generateMock(found, limit - realTxns.length);
-          res.json([...realTxns, ...mock].sort((a, b) => b!.timestamp - a!.timestamp).slice(0, limit));
-          return;
+          const realTxns = (events as CetusEvent[]).map((ev) => parseCetusEvent(ev, found!)).filter(Boolean).slice(0, limit);
+          if (realTxns.length >= 1) {
+            res.json(realTxns);
+            return;
+          }
         }
-        res.json(generateMock(found, limit));
+
+        // 4. No real data available — return empty so the UI shows no fake trades
+        res.json([]);
         return;
       }
     }
-    const trending = await fetchAllPairs().catch(() => []);
-    const top = trending.slice(0, 5);
-    const txns = top.flatMap((p) => generateMock(p, Math.ceil(limit / Math.max(top.length, 1))));
-    txns.sort((a, b) => b.timestamp - a.timestamp);
-    res.json(txns.slice(0, limit));
+    // No pair specified — return empty (no fake global feed)
+    res.json([]);
   } catch (err) {
     req.log.error({ err }, "Failed to fetch transactions");
     res.status(500).json({ error: (err as Error).message });
