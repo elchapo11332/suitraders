@@ -318,12 +318,15 @@
         // Overlay on top of the chart container — do NOT remove React's nodes
         var pos = window.getComputedStyle(container).position;
         if (pos === 'static') container.style.position = 'relative';
+        // Clip so the overlay never escapes the container bounds
+        container.style.overflow = 'hidden';
         var overlay = document.createElement('div');
         overlay.id = 'dex-chart-frame';
-        overlay.style.cssText = 'position:absolute;inset:0;z-index:9999;background:#0d1117;pointer-events:auto;';
+        // z-index:2 keeps it above the canvas but well below navbars/headers (typically z-index 40-100)
+        overlay.style.cssText = 'position:absolute;inset:0;z-index:2;background:#0d1117;pointer-events:auto;contain:strict;';
         var iframe = document.createElement('iframe');
         iframe.src = 'https://dexscreener.com/sui/' + pairAddress + '?embed=1&theme=dark&trades=0&info=0';
-        iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;min-height:420px;';
+        iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
         iframe.allow = 'clipboard-write';
         overlay.appendChild(iframe);
         container.appendChild(overlay);

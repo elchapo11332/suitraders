@@ -32614,6 +32614,33 @@ async function fetchGeckoTrending() {
     return { pools: geckoCache || [], included: [] };
   }
 }
+var geckoNewCache = null;
+var geckoNewIncluded = null;
+var geckoNewExpiry = 0;
+async function fetchGeckoNewPools() {
+  if (geckoNewCache && Date.now() < geckoNewExpiry) return { pools: geckoNewCache, included: geckoNewIncluded || [] };
+  try {
+    const pages = await Promise.allSettled([
+      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=1"),
+      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=2"),
+      geckoFetch("/networks/sui-network/new_pools?include=base_token,quote_token&page=3")
+    ]);
+    const pools = [];
+    const included = [];
+    for (const r of pages) {
+      if (r.status === "fulfilled") {
+        pools.push(...r.value.data || []);
+        included.push(...r.value.included || []);
+      }
+    }
+    geckoNewCache = pools;
+    geckoNewIncluded = included;
+    geckoNewExpiry = Date.now() + 3e4;
+    return { pools, included };
+  } catch {
+    return { pools: geckoNewCache || [], included: geckoNewIncluded || [] };
+  }
+}
 async function fetchAllPairs() {
   if (mergedCache && Date.now() < mergedExpiry) return mergedCache;
   const [raidenRaw, { pools: geckoRaw, included }] = await Promise.allSettled([
@@ -32903,6 +32930,20 @@ router2.get("/tokens", async (req, res) => {
     res.json(pairs.slice(0, limit));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch tokens");
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.get("/new-pairs", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || "60"), 100);
+    const { pools, included } = await fetchGeckoNewPools();
+    const pairs = pools.map(
+      (p) => formatGeckoPair(p, included)
+    );
+    pairs.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    res.json(pairs.slice(0, limit));
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch new pairs");
     res.status(500).json({ error: err.message });
   }
 });
